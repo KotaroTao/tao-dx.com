@@ -1,148 +1,104 @@
 # 開発環境セットアップガイド
 
-## 開発フロー概要
+## 開発フロー
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        開発フロー                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐    PR作成     ┌──────────────┐               │
-│  │ Claude Code  │ ───────────── │   GitHub     │               │
-│  │  (メイン開発)  │               │              │               │
-│  └──────────────┘               └──────┬───────┘               │
-│                                        │                        │
-│                                   マージ │                        │
-│                                        ▼                        │
-│                               ┌──────────────┐                  │
-│                               │GitHub Actions│                  │
-│                               │  (自動実行)   │                  │
-│                               └──────┬───────┘                  │
-│                                      │                          │
-│                                 自動デプロイ                      │
-│                                      ▼                          │
-│                           ┌──────────────────┐                  │
-│                           │ エックスサーバーVPS │                  │
-│                           │   tao-dx.com     │                  │
-│                           └──────────────────┘                  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────┐    PR作成     ┌──────────┐    マージ     ┌─────────┐
+│ Claude Code │ ────────────> │  GitHub  │ ────────────> │ Coolify │
+└─────────────┘               └──────────┘               └────┬────┘
+                                                              │
+                                   ┌──────────────────────────┘
+                                   ▼
+                            ┌─────────────┐
+                            │ VPS (本番)  │
+                            │ tao-dx.com  │
+                            └─────────────┘
 ```
 
-## 開発の進め方
+## VPS初期セットアップ（1回のみ）
 
-### 1. Claude Codeで開発（メイン）
-
-Claude Codeがコードを書き、自動でブランチを作成してプルリクエストを作成します。
-
-```
-あなた: 「〇〇の機能を追加して」
-Claude Code: コードを書く → PRを作成
-あなた: GitHubでPRを確認 → マージ
-GitHub Actions: 自動でVPSにデプロイ
-```
-
-### 2. Termiusの使用場面（必要最小限）
-
-- VPSの初期セットアップ時
-- サーバーのトラブルシューティング時
-- ログの確認時
-
-## VPS初期セットアップ（Termius使用・1回のみ）
-
-### 1. 基本パッケージのインストール
+### 1. Coolifyのインストール
 
 ```bash
-# システムの更新
-sudo apt update && sudo apt upgrade -y
-
-# 必要なパッケージ
-sudo apt install -y git curl nginx
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
 
-### 2. Node.jsのインストール
+### 2. Coolify管理画面にアクセス
+
+```
+https://[VPSのIPアドレス]:8000
+```
+
+### 3. Coolifyでの設定
+
+1. **GitHub連携**: Settings → Git → GitHubを接続
+2. **プロジェクト作成**: New Project → tao-dx.com
+3. **アプリ追加**:
+   - Add Resource → Application
+   - Repository: KotaroTao/tao-dx.com
+   - Build Pack: Dockerfile
+4. **PostgreSQL追加**:
+   - Add Resource → Database → PostgreSQL
+   - 自動で `DATABASE_URL` が設定される
+5. **ドメイン設定**:
+   - Domains: tao-dx.com
+   - SSL: Let's Encrypt（自動）
+
+### 4. PRプレビューの有効化
+
+Coolify の Application Settings で:
+- Preview Deployments: ON
+- Preview URL Pattern: `pr-{{PR_NUMBER}}.tao-dx.com`
+
+## 日常の開発
+
+### 機能追加・修正
+
+```
+1. Claude Codeに依頼
+2. PRが作成される
+3. Coolifyがプレビュー環境を自動生成
+   → https://pr-123.tao-dx.com で確認
+4. GitHubでマージ
+5. 本番に自動デプロイ
+```
+
+### Termiusが必要な場面（稀）
+
+- Coolifyのトラブルシューティング
+- サーバーログの確認
+- 手動でのDB操作
+
+## ローカル開発（オプション）
+
+VPS上で直接開発する場合:
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-source ~/.bashrc
-nvm install --lts
+cd /var/www/tao-dx.com
+
+# 開発サーバー起動
+npm run dev
+
+# Prisma Studio（DB管理UI）
+npm run db:studio
 ```
 
-### 3. デプロイ用SSH鍵の設定
+## 環境変数
 
-GitHub Actionsからの自動デプロイ用にSSH鍵を設定します。
+Coolifyの管理画面で設定:
 
-```bash
-# デプロイ用の公開鍵を authorized_keys に追加
-# （GitHub Secretsに登録した秘密鍵に対応する公開鍵）
-echo "ssh-ed25519 AAAA..." >> ~/.ssh/authorized_keys
-```
-
-### 4. プロジェクトディレクトリの準備
-
-```bash
-# 本番用ディレクトリを作成
-sudo mkdir -p /var/www/tao-dx.com
-sudo chown $USER:$USER /var/www/tao-dx.com
-
-# 初回クローン
-git clone git@github.com:KotaroTao/tao-dx.com.git /var/www/tao-dx.com
-```
-
-## GitHub Secretsの設定
-
-GitHubリポジトリの Settings > Secrets and variables > Actions で以下を設定：
-
-| Secret名 | 内容 |
-|----------|------|
-| `VPS_HOST` | VPSのIPアドレス |
-| `VPS_USER` | SSHユーザー名 |
-| `VPS_SSH_KEY` | SSH秘密鍵（ed25519） |
-| `VPS_PORT` | SSHポート（デフォルト: 22） |
-
-## 自動デプロイの仕組み
-
-1. `main`ブランチにマージ
-2. GitHub Actionsが起動
-3. SSHでVPSに接続
-4. `git pull`で最新コードを取得
-5. 依存関係のインストール
-6. アプリの再起動
-
-## Nginx設定（参考）
-
-```nginx
-server {
-    listen 80;
-    server_name tao-dx.com www.tao-dx.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
+| 変数名 | 説明 |
+|--------|------|
+| `DATABASE_URL` | PostgreSQL接続URL（自動設定） |
 
 ## トラブルシューティング
 
-### デプロイが失敗する場合
+### デプロイが失敗する
 
-1. GitHub Actionsのログを確認
-2. Secretsが正しく設定されているか確認
-3. VPSのSSH接続が可能か確認（Termiusで確認）
+1. Coolify → Deployments でログを確認
+2. Dockerビルドエラーがないか確認
 
-### アプリが起動しない場合
+### DBに接続できない
 
-Termiusで接続して確認：
-
-```bash
-# ログを確認
-pm2 logs
-
-# 手動で再起動
-pm2 restart all
-```
+1. PostgreSQLコンテナが起動しているか確認
+2. `DATABASE_URL` が正しく設定されているか確認

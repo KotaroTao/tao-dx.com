@@ -13,6 +13,9 @@ build/
 .next/
 out/
 
+# Next.js
+next-env.d.ts
+
 # Logs
 logs/
 *.log
@@ -35,3 +38,7 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal

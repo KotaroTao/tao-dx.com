@@ -16,23 +16,38 @@ T.A.O Marketing Systemは、マーケティング業務を効率化するため�
 
 ## 技術スタック
 
-*開発中*
+| 分類 | 技術 |
+|------|------|
+| フレームワーク | Next.js 14 (App Router) |
+| 言語 | TypeScript |
+| データベース | PostgreSQL |
+| ORM | Prisma |
+| インフラ | Coolify (VPS) |
+| コンテナ | Docker |
+
+## 開発フロー
+
+```
+Claude Code → GitHub PR → マージ → 自動デプロイ（Coolify）
+```
 
 ## ドメイン
 
 - 本番環境: https://tao-dx.com
 
-## 開発フロー
+## ローカル開発
 
+```bash
+# 依存関係インストール
+npm install
+
+# 開発サーバー起動
+npm run dev
 ```
-Claude Code → GitHub PR → マージ → 自動デプロイ（VPS）
-```
 
-1. **Claude Code**でコード開発・PR作成
-2. **GitHub**でPRレビュー・マージ
-3. **GitHub Actions**が自動でVPSにデプロイ
+## ドキュメント
 
-詳細は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
+- [開発環境セットアップ](docs/DEVELOPMENT.md)
 
 ## ライセンス
 
