@@ -1,39 +1,18 @@
+import Link from 'next/link'
+import { ArrowRight } from 'lucide-react'
+
 export default function Home() {
   return (
-    <main style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      padding: '2rem',
-      textAlign: 'center',
-    }}>
-      <h1 style={{
-        fontSize: '3rem',
-        fontWeight: 'bold',
-        marginBottom: '1rem',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-      }}>
+    <main className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
+      <h1 className="text-5xl md:text-6xl font-bold mb-4 gradient-text">
         T.A.O Marketing System
       </h1>
 
-      <p style={{
-        fontSize: '1.5rem',
-        opacity: 0.9,
-        marginBottom: '3rem',
-      }}>
+      <p className="text-xl md:text-2xl text-gray-300 mb-8">
         Think / Act / Optimize
       </p>
 
-      <div style={{
-        display: 'flex',
-        gap: '2rem',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-      }}>
+      <div className="flex flex-wrap justify-center gap-6 mb-12">
         <Card
           title="Think"
           subtitle="考える"
@@ -51,11 +30,23 @@ export default function Home() {
         />
       </div>
 
-      <p style={{
-        marginTop: '4rem',
-        opacity: 0.6,
-        fontSize: '0.9rem',
-      }}>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg font-medium transition-all"
+        >
+          ログイン
+          <ArrowRight className="w-5 h-5" />
+        </Link>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg font-medium transition-all"
+        >
+          ダッシュボード
+        </Link>
+      </div>
+
+      <p className="mt-16 text-gray-500 text-sm">
         by 田尾耕太郎
       </p>
     </main>
@@ -68,30 +59,10 @@ function Card({ title, subtitle, description }: {
   description: string
 }) {
   return (
-    <div style={{
-      background: 'rgba(255, 255, 255, 0.1)',
-      borderRadius: '1rem',
-      padding: '2rem',
-      width: '250px',
-      backdropFilter: 'blur(10px)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-    }}>
-      <h2 style={{
-        fontSize: '2rem',
-        marginBottom: '0.5rem',
-      }}>
-        {title}
-      </h2>
-      <p style={{
-        fontSize: '1.2rem',
-        opacity: 0.8,
-        marginBottom: '1rem',
-      }}>
-        {subtitle}
-      </p>
-      <p style={{ opacity: 0.7 }}>
-        {description}
-      </p>
+    <div className="bg-white/5 backdrop-blur-lg rounded-2xl p-6 w-64 border border-white/10 hover:border-purple-500/30 transition-colors">
+      <h2 className="text-3xl font-bold mb-2">{title}</h2>
+      <p className="text-lg text-gray-400 mb-3">{subtitle}</p>
+      <p className="text-gray-500">{description}</p>
     </div>
   )
 }
