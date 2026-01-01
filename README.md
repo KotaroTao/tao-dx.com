@@ -22,14 +22,17 @@ T.A.O Marketing Systemは、マーケティング業務を効率化するため�
 
 - 本番環境: https://tao-dx.com
 
-## 開発環境
+## 開発フロー
 
-- **Claude Code** - AIアシスタント開発
-- **GitHub** - ソースコード管理
-- **Termius** - iPadからSSH接続
-- **エックスサーバーVPS** - ホスティング環境
+```
+Claude Code → GitHub PR → マージ → 自動デプロイ（VPS）
+```
 
-詳細なセットアップ手順は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照してください。
+1. **Claude Code**でコード開発・PR作成
+2. **GitHub**でPRレビュー・マージ
+3. **GitHub Actions**が自動でVPSにデプロイ
+
+詳細は [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) を参照。
 
 ## ライセンス
 

@@ -1,138 +1,148 @@
 # 開発環境セットアップガイド
 
-## 概要
-
-T.A.O Marketing Systemは、iPadからリモート開発できる環境を構築しています。
+## 開発フロー概要
 
 ```
-┌─────────────┐     SSH      ┌──────────────────┐
-│   iPad      │ ──────────── │  エックスサーバー │
-│  (Termius)  │              │      VPS         │
-└─────────────┘              └──────────────────┘
-                                      │
-                              ┌───────┴───────┐
-                              │               │
-                        ┌─────▼─────┐   ┌─────▼─────┐
-                        │ Claude    │   │  GitHub   │
-                        │ Code      │   │           │
-                        └───────────┘   └───────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        開発フロー                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐    PR作成     ┌──────────────┐               │
+│  │ Claude Code  │ ───────────── │   GitHub     │               │
+│  │  (メイン開発)  │               │              │               │
+│  └──────────────┘               └──────┬───────┘               │
+│                                        │                        │
+│                                   マージ │                        │
+│                                        ▼                        │
+│                               ┌──────────────┐                  │
+│                               │GitHub Actions│                  │
+│                               │  (自動実行)   │                  │
+│                               └──────┬───────┘                  │
+│                                      │                          │
+│                                 自動デプロイ                      │
+│                                      ▼                          │
+│                           ┌──────────────────┐                  │
+│                           │ エックスサーバーVPS │                  │
+│                           │   tao-dx.com     │                  │
+│                           └──────────────────┘                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## 必要なツール
+## 開発の進め方
 
-### iPad側
-- **Termius** - SSH/SFTPクライアント
-  - App Storeからダウンロード
-  - VPSへのSSH接続に使用
+### 1. Claude Codeで開発（メイン）
 
-### サーバー側（エックスサーバーVPS）
-- **Git** - バージョン管理
-- **Node.js** - JavaScriptランタイム（推奨: LTS版）
-- **Claude Code CLI** - AI開発アシスタント
+Claude Codeがコードを書き、自動でブランチを作成してプルリクエストを作成します。
 
-## セットアップ手順
+```
+あなた: 「〇〇の機能を追加して」
+Claude Code: コードを書く → PRを作成
+あなた: GitHubでPRを確認 → マージ
+GitHub Actions: 自動でVPSにデプロイ
+```
 
-### 1. VPSの初期設定
+### 2. Termiusの使用場面（必要最小限）
+
+- VPSの初期セットアップ時
+- サーバーのトラブルシューティング時
+- ログの確認時
+
+## VPS初期セットアップ（Termius使用・1回のみ）
+
+### 1. 基本パッケージのインストール
 
 ```bash
 # システムの更新
 sudo apt update && sudo apt upgrade -y
 
-# 必要なパッケージのインストール
-sudo apt install -y git curl wget build-essential
+# 必要なパッケージ
+sudo apt install -y git curl nginx
 ```
 
 ### 2. Node.jsのインストール
 
 ```bash
-# Node.js LTSのインストール（nvm経由）
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 source ~/.bashrc
 nvm install --lts
-nvm use --lts
 ```
 
-### 3. Claude Code CLIのセットアップ
+### 3. デプロイ用SSH鍵の設定
+
+GitHub Actionsからの自動デプロイ用にSSH鍵を設定します。
 
 ```bash
-# Claude Codeのインストール
-npm install -g @anthropic-ai/claude-code
-
-# 認証設定
-claude-code auth
+# デプロイ用の公開鍵を authorized_keys に追加
+# （GitHub Secretsに登録した秘密鍵に対応する公開鍵）
+echo "ssh-ed25519 AAAA..." >> ~/.ssh/authorized_keys
 ```
 
-### 4. GitHubとの連携
+### 4. プロジェクトディレクトリの準備
 
 ```bash
-# SSH鍵の生成
-ssh-keygen -t ed25519 -C "your-email@example.com"
+# 本番用ディレクトリを作成
+sudo mkdir -p /var/www/tao-dx.com
+sudo chown $USER:$USER /var/www/tao-dx.com
 
-# 公開鍵を表示（GitHubに登録）
-cat ~/.ssh/id_ed25519.pub
-
-# SSH接続のテスト
-ssh -T git@github.com
+# 初回クローン
+git clone git@github.com:KotaroTao/tao-dx.com.git /var/www/tao-dx.com
 ```
 
-### 5. プロジェクトのクローン
+## GitHub Secretsの設定
 
-```bash
-git clone git@github.com:KotaroTao/tao-dx.com.git
-cd tao-dx.com
+GitHubリポジトリの Settings > Secrets and variables > Actions で以下を設定：
+
+| Secret名 | 内容 |
+|----------|------|
+| `VPS_HOST` | VPSのIPアドレス |
+| `VPS_USER` | SSHユーザー名 |
+| `VPS_SSH_KEY` | SSH秘密鍵（ed25519） |
+| `VPS_PORT` | SSHポート（デフォルト: 22） |
+
+## 自動デプロイの仕組み
+
+1. `main`ブランチにマージ
+2. GitHub Actionsが起動
+3. SSHでVPSに接続
+4. `git pull`で最新コードを取得
+5. 依存関係のインストール
+6. アプリの再起動
+
+## Nginx設定（参考）
+
+```nginx
+server {
+    listen 80;
+    server_name tao-dx.com www.tao-dx.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
 ```
-
-## Termiusの設定
-
-### 新しいホストの追加
-
-1. Termiusを開く
-2. 「+」ボタンで新規ホストを追加
-3. 以下を設定:
-   - **Label**: TAO VPS
-   - **Hostname**: （VPSのIPアドレス）
-   - **Port**: 22
-   - **Username**: （ユーザー名）
-   - **Password** または **Key**: 認証情報
-
-### 推奨設定
-
-- **Keep Alive**: 有効（接続を維持）
-- **Font Size**: 14-16pt（iPadで見やすいサイズ）
-
-## 日常の開発フロー
-
-```bash
-# 1. 最新のコードを取得
-git pull origin main
-
-# 2. Claude Codeで開発
-claude-code
-
-# 3. 変更をコミット
-git add .
-git commit -m "変更内容の説明"
-
-# 4. GitHubにプッシュ
-git push origin main
-```
-
-## ドメイン設定（tao-dx.com）
-
-*エックスサーバーVPSでのドメイン設定手順は別途記載*
 
 ## トラブルシューティング
 
-### SSH接続が切れる場合
+### デプロイが失敗する場合
 
-Termiusの設定で「Keep Alive」を有効にしてください。
+1. GitHub Actionsのログを確認
+2. Secretsが正しく設定されているか確認
+3. VPSのSSH接続が可能か確認（Termiusで確認）
 
-### パーミッションエラーが発生する場合
+### アプリが起動しない場合
+
+Termiusで接続して確認：
 
 ```bash
-# ファイルの所有権を確認
-ls -la
+# ログを確認
+pm2 logs
 
-# 必要に応じて所有権を変更
-sudo chown -R $USER:$USER /path/to/project
+# 手動で再起動
+pm2 restart all
 ```
