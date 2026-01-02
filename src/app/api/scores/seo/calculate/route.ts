@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // PageSpeed Insights API を使用してSEOスコアを自動計算
 export async function POST(request: NextRequest) {
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
         q9KeywordRank: scores.q9KeywordRank,
         q10IndexCtr: scores.q10IndexCtr,
         totalScore,
-        evaluationData: pageSpeedData,
+        evaluationData: pageSpeedData as Prisma.InputJsonValue,
       },
     });
 
