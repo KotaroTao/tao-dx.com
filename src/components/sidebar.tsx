@@ -30,10 +30,7 @@ export function Sidebar() {
       <div className="p-6">
         <Link href="/dashboard" className="block">
           <h1 className="text-4xl font-bold gradient-text tracking-wider">T.A.O</h1>
-          <div className="text-[10px] text-gray-400 mt-1 leading-tight tracking-widest uppercase">
-            <div>Marketing</div>
-            <div>System</div>
-          </div>
+          <p className="text-[10px] text-gray-400 mt-1 tracking-widest uppercase">Marketing System</p>
         </Link>
       </div>
 
