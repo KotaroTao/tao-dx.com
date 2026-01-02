@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -7,11 +8,445 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 基本的なユーザーモデル（認証用）
+// ユーザーモデル（認証・権限管理）
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // リレーション
+  customers     Customer[]
+  tasks         Task[]
+  campaigns     Campaign[]
+  clinics       Clinic[]
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+// 顧客モデル（CRM）
+model Customer {
+  id            String         @id @default(cuid())
+  name          String
+  email         String?
+  phone         String?
+  company       String?
+  status        CustomerStatus @default(LEAD)
+  notes         String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // リレーション
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  campaigns     CampaignCustomer[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum CustomerStatus {
+  LEAD       // リード（見込み）
+  PROSPECT   // 商談中
+  CUSTOMER   // 成約顧客
+  CHURNED    // 離脱
+}
+
+// タスクモデル
+model Task {
+  id            String       @id @default(cuid())
+  title         String
+  description   String?      @db.Text
+  status        TaskStatus   @default(TODO)
+  priority      Priority     @default(MEDIUM)
+  dueDate       DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // リレーション
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customer      Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  campaignId    String?
+  campaign      Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+enum TaskStatus {
+  TODO        // 未着手
+  IN_PROGRESS // 進行中
+  DONE        // 完了
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// キャンペーンモデル
+model Campaign {
+  id            String          @id @default(cuid())
+  name          String
+  description   String?         @db.Text
+  status        CampaignStatus  @default(DRAFT)
+  startDate     DateTime?
+  endDate       DateTime?
+  budget        Decimal?        @db.Decimal(12, 2)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // リレーション
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  customers     CampaignCustomer[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum CampaignStatus {
+  DRAFT      // 下書き
+  ACTIVE     // 実行中
+  PAUSED     // 一時停止
+  COMPLETED  // 完了
+}
+
+// キャンペーンと顧客の中間テーブル（多対多）
+model CampaignCustomer {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  addedAt     DateTime @default(now())
+
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([customerId])
+}
+
+// ============================================
+// T.A.O スコアリングシステム用モデル
+// ============================================
+
+// 歯科医院モデル
+model Clinic {
+  id            String    @id @default(cuid())
+  name          String    // 医院名
+  nameKana      String?   // フリガナ
+  postalCode    String?   // 郵便番号
+  address       String?   // 住所
+  phone         String?   // 電話番号
+  fax           String?   // FAX番号
+  website       String?   // ウェブサイトURL
+  email         String?   // メールアドレス
+  specialties   String[]  // 診療科目
+  businessHours Json?     // 診療時間
+  closedDays    String[]  // 休診日
+  directorName  String?   // 院長名
+  foundedYear   Int?      // 開業年
+  staffCount    Int?      // スタッフ数
+  description   String?   @db.Text // 医院紹介文
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // リレーション
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scores        Score[]
+  analyticsConnections AnalyticsConnection[]
+  seoScoreDetails SEOScoreDetail[]
+
+  @@index([userId])
+}
+
+// スコア履歴モデル（8項目の総合スコア）
+model Score {
+  id              String    @id @default(cuid())
+  clinicId        String
+  clinic          Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  date            DateTime  @default(now()) // スコア日付
+
+  // 8項目のスコア（各100点満点）
+  homepageScore   Int?      // ホームページスコア
+  seoScore        Int?      // SEOスコア
+  meoScore        Int?      // MEOスコア
+  llmoScore       Int?      // LLMOスコア
+  adScore         Int?      // WEB広告スコア（未実施の場合null）
+  snsScore        Int?      // SNSスコア
+  reviewScore     Int?      // 口コミ・評判スコア
+  offlineScore    Int?      // オフラインスコア
+
+  // 総合スコア（計算済み）
+  totalScore      Int?      // 総合スコア
+
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+  @@index([date])
+}
+
+// SEOスコア詳細モデル（10設問の詳細）
+model SEOScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  clinic          Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  evaluatedAt     DateTime  @default(now()) // 評価日時
+
+  // 【テクニカルSEO】設問1-3
+  q1SslMobile     Int       @default(0) // SSL/HTTPS + モバイル対応
+  q2CoreWebVitals Int       @default(0) // Core Web Vitals
+  q3Crawlability  Int       @default(0) // クローラビリティ
+
+  // 【コンテンツSEO】設問4-6
+  q4TitleTag      Int       @default(0) // タイトルタグ最適化
+  q5MetaDesc      Int       @default(0) // メタディスクリプション
+  q6HeadingEeat   Int       @default(0) // 見出し構造 + E-E-A-T
+
+  // 【内部対策】設問7-8
+  q7InternalLinks Int       @default(0) // 内部リンク + サイト構造
+  q8UrlCanonical  Int       @default(0) // URL正規化 + 重複対策
+
+  // 【検索パフォーマンス】設問9-10
+  q9KeywordRank   Int       @default(0) // 主要KW検索順位
+  q10IndexCtr     Int       @default(0) // インデックス率 + CTR
+
+  // 合計スコア（計算済み）
+  totalScore      Int       @default(0) // 合計（0-100）
+
+  // 評価の根拠データ（JSON）
+  evaluationData  Json?     // API取得データ等
+
+  // AI分析結果
+  aiAnalysis      String?   @db.Text // AI による現状説明
+  aiSuggestions   Json?     // AI による改善提案リスト
+
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+  @@index([evaluatedAt])
+}
+
+// 外部サービス連携モデル
+model AnalyticsConnection {
+  id            String              @id @default(cuid())
+  clinicId      String
+  clinic        Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  type          AnalyticsType       // 連携タイプ
+  accessToken   String?             @db.Text // アクセストークン（暗号化推奨）
+  refreshToken  String?             @db.Text // リフレッシュトークン（暗号化推奨）
+  propertyId    String?             // プロパティID（GA4等）
+  siteUrl       String?             // サイトURL（Search Console等）
+  isActive      Boolean             @default(true)
+  lastSyncAt    DateTime?           // 最終同期日時
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([clinicId, type])
+  @@index([clinicId])
+}
+
+enum AnalyticsType {
+  GA4             // Google Analytics 4
+  SEARCH_CONSOLE  // Google Search Console
+  GBP             // Google Business Profile
+  GOOGLE_ADS      // Google Ads
+  INSTAGRAM       // Instagram Graph API
+  FACEBOOK        // Facebook Graph API
+  LINE            // LINE Official Account
+}
+
+// MEOスコア詳細モデル
+model MEOScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1MapRank       Int       @default(0) // マップ順位
+  q2GbpSetup      Int       @default(0) // GBP登録状況
+  q3BusinessHours Int       @default(0) // 営業時間設定
+  q4PhotoCount    Int       @default(0) // 写真枚数
+  q5PhotoTypes    Int       @default(0) // 写真種類
+  q6PostFrequency Int       @default(0) // 投稿頻度
+  q7Services      Int       @default(0) // サービス登録
+  q8Attributes    Int       @default(0) // 属性情報
+  q9Description   Int       @default(0) // 説明文充実度
+  q10QaResponse   Int       @default(0) // Q&A回答
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+}
+
+// LLMOスコア詳細モデル
+model LLMOScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1AiMention     Int       @default(0) // AI言及
+  q2AiRecommend   Int       @default(0) // AI推薦
+  q3LocalBusiness Int       @default(0) // 構造化データ LocalBusiness
+  q4Dentist       Int       @default(0) // 構造化データ Dentist
+  q5FaqSchema     Int       @default(0) // FAQ構造化データ
+  q6DirectorBio   Int       @default(0) // 院長経歴
+  q7CaseCount     Int       @default(0) // 症例数
+  q8Expertise     Int       @default(0) // 専門性
+  q9ReviewSchema  Int       @default(0) // 口コミ構造化データ
+  q10Freshness    Int       @default(0) // 更新頻度
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+}
+
+// ホームページスコア詳細モデル
+model HomepageScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1Ssl           Int       @default(0) // SSL対応
+  q2Mobile        Int       @default(0) // モバイル対応
+  q3PageSpeed     Int       @default(0) // ページ速度
+  q4EssentialPages Int      @default(0) // 必須ページ
+  q5DirectorPage  Int       @default(0) // 院長紹介
+  q6ServiceDetail Int       @default(0) // 診療案内
+  q7PriceList     Int       @default(0) // 料金表
+  q8Booking       Int       @default(0) // 予約導線
+  q9BlogUpdate    Int       @default(0) // ブログ更新
+  q10AccessInfo   Int       @default(0) // アクセス情報
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+}
+
+// WEB広告スコア詳細モデル
+model AdScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1AdActive      Int       @default(0) // 広告実施有無
+  q2GeoTarget     Int       @default(0) // 地域ターゲティング
+  q3Keywords      Int       @default(0) // 主要KW出稿
+  q4AdCopy        Int       @default(0) // 広告文最適化
+  q5QualityScore  Int       @default(0) // 品質スコア
+  q6Conversion    Int       @default(0) // CV計測
+  q7LandingPage   Int       @default(0) // LP
+  q8Remarketing   Int       @default(0) // リマーケティング
+  q9Extensions    Int       @default(0) // 広告表示オプション
+  q10Roi          Int       @default(0) // 費用対効果
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+}
+
+// SNSスコア詳細モデル
+model SNSScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1Instagram     Int       @default(0) // Instagram
+  q2IgFollowers   Int       @default(0) // IGフォロワー
+  q3Line          Int       @default(0) // LINE公式
+  q4LineFriends   Int       @default(0) // LINE友だち
+  q5Facebook      Int       @default(0) // Facebook
+  q6Youtube       Int       @default(0) // YouTube
+  q7ContentQuality Int      @default(0) // 投稿の質
+  q8Engagement    Int       @default(0) // エンゲージメント
+  q9Profile       Int       @default(0) // プロフィール充実度
+  q10Integration  Int       @default(0) // SNS間連携
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+}
+
+// 口コミ・評判スコア詳細モデル
+model ReviewScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1GoogleRating  Int       @default(0) // Google評価
+  q2GoogleCount   Int       @default(0) // Google口コミ数
+  q3ReplyRate     Int       @default(0) // 返信率
+  q4ReplySpeed    Int       @default(0) // 返信速度
+  q5ReplyQuality  Int       @default(0) // 返信の質
+  q6NegativeHandle Int      @default(0) // ネガティブ対応
+  q7EparkRating   Int       @default(0) // EPARK評価
+  q8PortalRating  Int       @default(0) // ポータル評価
+  q9ReviewRequest Int       @default(0) // 口コミ依頼の仕組み
+  q10Recency      Int       @default(0) // 最新口コミ
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
+}
+
+// オフラインスコア詳細モデル
+model OfflineScoreDetail {
+  id              String    @id @default(cuid())
+  clinicId        String
+  evaluatedAt     DateTime  @default(now())
+
+  q1Signage       Int       @default(0) // 外看板
+  q2SignInfo      Int       @default(0) // 看板情報
+  q3InternalPoster Int      @default(0) // 院内掲示
+  q4AppointmentCard Int     @default(0) // 診察券
+  q5Leaflet       Int       @default(0) // リーフレット
+  q6ReferralCard  Int       @default(0) // 紹介カード
+  q7Reminder      Int       @default(0) // 定期検診リマインド
+  q8Newsletter    Int       @default(0) // ニュースレター
+  q9LocalEvent    Int       @default(0) // 地域イベント
+  q10SchoolCheck  Int       @default(0) // 学校・企業健診
+
+  totalScore      Int       @default(0)
+  evaluationData  Json?
+  aiAnalysis      String?   @db.Text
+  aiSuggestions   Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([clinicId])
 }
