@@ -1,8 +1,7 @@
-FROM node:20-alpine AS base
+FROM node:20-slim AS base
 
 # 依存関係インストール
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json ./
 COPY prisma ./prisma/
@@ -21,11 +20,11 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# OpenSSLをインストール（Prisma用）
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Prisma CLIをインストール（マイグレーション用）
-RUN npm install -g prisma
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
