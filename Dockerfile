@@ -20,9 +20,9 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# OpenSSLとPrisma CLIをインストール
+# OpenSSLとPrisma CLIをインストール（プロジェクトと同じバージョン）
 RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN npm install -g prisma
+RUN npm install -g prisma@5.22.0
 
 RUN groupadd --system --gid 1001 nodejs
 RUN useradd --system --uid 1001 nextjs
