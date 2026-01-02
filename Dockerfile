@@ -3,16 +3,15 @@ FROM node:20-slim AS base
 # 依存関係インストール
 FROM base AS deps
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY prisma ./prisma/
-RUN npm install
+RUN npm ci --legacy-peer-deps
 
 # ビルド
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate
 RUN npm run build
 
 # 本番環境
