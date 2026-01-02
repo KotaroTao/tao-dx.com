@@ -9,11 +9,13 @@ import {
   Megaphone,
   Settings,
   LogOut,
+  BarChart3,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 
 const navItems = [
   { href: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
+  { href: '/scoring', label: 'スコアリング', icon: BarChart3 },
   { href: '/customers', label: '顧客管理', icon: Users },
   { href: '/tasks', label: 'タスク', icon: CheckSquare },
   { href: '/campaigns', label: 'キャンペーン', icon: Megaphone },

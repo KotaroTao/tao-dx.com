@@ -42,3 +42,4 @@ temp/
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+tsconfig.tsbuildinfo
