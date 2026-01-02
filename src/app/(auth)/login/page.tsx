@@ -123,8 +123,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-2">T.A.O</h1>
-          <p className="text-gray-400">Marketing System</p>
+          <h1 className="text-6xl font-bold gradient-text mb-3 tracking-wider">T.A.O</h1>
+          <p className="text-xs text-gray-400 tracking-widest uppercase">Marketing System</p>
         </div>
 
         <Suspense fallback={<LoginFormFallback />}>

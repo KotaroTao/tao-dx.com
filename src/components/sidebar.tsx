@@ -29,8 +29,8 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-black/20 backdrop-blur-lg border-r border-white/10 flex flex-col">
       <div className="p-6">
         <Link href="/dashboard" className="block">
-          <h1 className="text-2xl font-bold gradient-text">T.A.O</h1>
-          <p className="text-xs text-gray-400 mt-1">Marketing System</p>
+          <h1 className="text-4xl font-bold gradient-text tracking-wider">T.A.O</h1>
+          <p className="text-[10px] text-gray-400 mt-1 tracking-widest uppercase">Marketing System</p>
         </Link>
       </div>
 
