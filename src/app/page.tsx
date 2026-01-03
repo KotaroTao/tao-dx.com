@@ -50,9 +50,14 @@ export default function Home() {
         </Link>
       </div>
 
-      <p className="mt-16 text-gray-500 text-sm">
-        by 田尾耕太郎
-      </p>
+      <a
+        href="https://function-t.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-16 text-gray-500 text-sm hover:text-purple-400 transition-colors"
+      >
+        © 株式会社ファンクション・ティ
+      </a>
     </main>
   )
 }
