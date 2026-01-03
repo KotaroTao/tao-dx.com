@@ -16,11 +16,7 @@ export default function Home() {
         </p>
       </div>
 
-      <p className="text-xl md:text-2xl text-gray-300 mb-8">
-        Think / Act / Optimize
-      </p>
-
-      <div className="flex flex-wrap justify-center gap-6 mb-12">
+      <div className="flex flex-wrap justify-center gap-6 mb-12 mt-8">
         <Card
           title="Think"
           subtitle="考える"
