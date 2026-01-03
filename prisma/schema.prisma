@@ -170,6 +170,14 @@ model Clinic {
   analyticsConnections AnalyticsConnection[]
   seoScoreDetails SEOScoreDetail[]
 
+  // メトリクス関連リレーション
+  metricCategories MetricCategory[]
+  dailyNotes       DailyNote[]
+  inquirySources   InquirySource[]
+  alertSettings    AlertSetting[]
+  alertHistory     AlertHistory[]
+  reportSettings   ReportSetting[]
+
   @@index([userId])
 }
 
@@ -448,5 +456,319 @@ model OfflineScoreDetail {
   aiSuggestions   Json?
   createdAt       DateTime  @default(now())
 
+  @@index([clinicId])
+}
+
+// ============================================
+// クリニックメトリクス・トラッキングシステム
+// ============================================
+
+// メトリクスカテゴリ（保険診療、自費診療など）
+model MetricCategory {
+  id          String       @id @default(cuid())
+  clinicId    String
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  name        String       // カテゴリ名
+  color       String       @default("#6366f1") // 表示色
+  icon        String?      // アイコン名（lucide-react）
+  sortOrder   Int          @default(0)
+  isDefault   Boolean      @default(false) // デフォルトカテゴリか
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // リレーション
+  items       MetricItem[]
+
+  @@unique([clinicId, name])
+  @@index([clinicId])
+  @@index([sortOrder])
+}
+
+// 計測項目タイプ
+enum MetricType {
+  COUNT       // 件数・人数（整数）
+  CURRENCY    // 金額（円）
+  PERCENTAGE  // 割合（%）
+  DURATION    // 時間（分）
+  NUMBER      // その他の数値
+}
+
+// 計測項目（患者数、新患数、売上など）
+model MetricItem {
+  id          String         @id @default(cuid())
+  clinicId    String
+  categoryId  String
+  category    MetricCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String         // 項目名
+  type        MetricType     @default(COUNT)
+  unit        String         @default("") // 単位
+  description String?        // 説明
+  sortOrder   Int            @default(0)
+  isDefault   Boolean        @default(false)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // リレーション
+  dailyMetrics DailyMetric[]
+  goals        MetricGoal[]
+  summaries    MetricSummary[]
+
+  @@unique([categoryId, name])
+  @@index([clinicId])
+  @@index([categoryId])
+  @@index([sortOrder])
+}
+
+// 日次メトリクス記録
+model DailyMetric {
+  id          String     @id @default(cuid())
+  clinicId    String
+  date        DateTime   @db.Date // 記録日
+  itemId      String
+  item        MetricItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  value       Decimal    @db.Decimal(15, 2) // 値
+  note        String?    // メモ
+  createdBy   String     // 入力者ID
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([clinicId, date, itemId])
+  @@index([clinicId])
+  @@index([date])
+  @@index([itemId])
+}
+
+// 日次メモ（その日全体のメモ）
+model DailyNote {
+  id          String   @id @default(cuid())
+  clinicId    String
+  clinic      Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  note        String   @db.Text
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([clinicId, date])
+  @@index([clinicId])
+  @@index([date])
+}
+
+// 目標期間タイプ
+enum GoalPeriod {
+  MONTHLY
+  YEARLY
+}
+
+// 目標設定
+model MetricGoal {
+  id          String     @id @default(cuid())
+  clinicId    String
+  itemId      String
+  item        MetricItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  period      GoalPeriod
+  year        Int
+  month       Int?       // 月次目標の場合のみ
+  targetValue Decimal    @db.Decimal(15, 2)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([clinicId, itemId, period, year, month])
+  @@index([clinicId])
+  @@index([itemId])
+  @@index([year])
+}
+
+// 集計期間タイプ
+enum SummaryPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+// 集計キャッシュ
+model MetricSummary {
+  id          String        @id @default(cuid())
+  clinicId    String
+  itemId      String
+  item        MetricItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  periodType  SummaryPeriod
+  periodStart DateTime      @db.Date
+  periodEnd   DateTime      @db.Date
+  sumValue    Decimal       @db.Decimal(15, 2) // 合計
+  avgValue    Decimal       @db.Decimal(15, 2) // 平均
+  minValue    Decimal       @db.Decimal(15, 2) // 最小
+  maxValue    Decimal       @db.Decimal(15, 2) // 最大
+  count       Int           // データ件数
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([clinicId, itemId, periodType, periodStart])
+  @@index([clinicId])
+  @@index([itemId])
+  @@index([periodType])
+  @@index([periodStart])
+}
+
+// ============================================
+// 問い合わせ経路トラッキング
+// ============================================
+
+// 流入経路タイプ
+enum SourceType {
+  WEBSITE         // ホームページ
+  GOOGLE_SEARCH   // Google検索
+  GOOGLE_MAPS     // Googleマップ
+  REFERRAL        // 紹介
+  SIGNAGE         // 看板
+  LEAFLET         // チラシ・DM
+  SNS_INSTAGRAM   // Instagram
+  SNS_LINE        // LINE
+  SNS_OTHER       // その他SNS
+  PORTAL_EPARK    // EPARK
+  PORTAL_OTHER    // その他ポータル
+  WALK_IN         // 飛び込み
+  OTHER           // その他
+}
+
+// 問い合わせ経路記録
+model InquirySource {
+  id              String     @id @default(cuid())
+  clinicId        String
+  clinic          Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  date            DateTime   @db.Date
+  source          SourceType
+  inquiryCount    Int        @default(0) // 問い合わせ数
+  newPatientCount Int        @default(0) // 新患数
+  revenue         Decimal?   @db.Decimal(15, 2) // 売上（追跡可能な場合）
+  note            String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([clinicId, date, source])
+  @@index([clinicId])
+  @@index([date])
+  @@index([source])
+}
+
+// ============================================
+// アラート・通知機能
+// ============================================
+
+// アラート重要度
+enum AlertSeverity {
+  INFO      // 情報
+  SUCCESS   // 成功
+  WARNING   // 警告
+  ALERT     // 緊急
+}
+
+// 通知チャネル
+enum NotificationChannel {
+  APP       // アプリ内通知
+  EMAIL     // メール
+  LINE      // LINE
+  SLACK     // Slack
+}
+
+// アラート設定
+model AlertSetting {
+  id              String               @id @default(cuid())
+  clinicId        String
+  clinic          Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  name            String               // アラート名
+  description     String?              // 説明
+  conditionType   String               // 条件タイプ（new_patient_drop, goal_warning, etc.）
+  conditionValue  Json                 // 条件値（JSON）
+  severity        AlertSeverity        @default(WARNING)
+  channels        NotificationChannel[]
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([clinicId])
+  @@index([conditionType])
+}
+
+// アラート履歴
+model AlertHistory {
+  id              String         @id @default(cuid())
+  clinicId        String
+  clinic          Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  alertSettingId  String?
+  title           String
+  message         String         @db.Text
+  severity        AlertSeverity
+  data            Json?          // アラート発生時のデータ
+  isRead          Boolean        @default(false)
+  readAt          DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@index([clinicId])
+  @@index([createdAt])
+  @@index([isRead])
+}
+
+// ============================================
+// レポート設定
+// ============================================
+
+// レポートタイプ
+enum ReportType {
+  DAILY       // 日次
+  WEEKLY      // 週次
+  MONTHLY     // 月次
+  QUARTERLY   // 四半期
+  YEARLY      // 年次
+}
+
+// レポート配信設定
+model ReportSetting {
+  id              String               @id @default(cuid())
+  clinicId        String
+  clinic          Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  reportType      ReportType
+  isEnabled       Boolean              @default(true)
+  channels        NotificationChannel[]
+  recipients      String[]             // 配信先ユーザーID
+  scheduleCron    String?              // cronスケジュール
+  lastSentAt      DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([clinicId, reportType])
+  @@index([clinicId])
+}
+
+// ============================================
+// 外部連携設定（将来の拡張用）
+// ============================================
+
+// 外部連携タイプ
+enum ExternalIntegrationType {
+  RECEPTY       // レセコン
+  RESERVATION   // 予約システム
+  ACCOUNTING    // 会計ソフト
+  SPREADSHEET   // Google スプレッドシート
+  CALENDAR      // Googleカレンダー
+}
+
+// 外部連携設定（将来の拡張用）
+model ExternalIntegration {
+  id              String                  @id @default(cuid())
+  clinicId        String
+  type            ExternalIntegrationType
+  name            String                  // 連携名
+  config          Json                    // 連携設定（API キー等）
+  isActive        Boolean                 @default(false)
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?                 // success, error, etc.
+  lastSyncMessage String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@unique([clinicId, type])
   @@index([clinicId])
 }
