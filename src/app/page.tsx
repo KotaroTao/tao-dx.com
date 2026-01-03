@@ -4,9 +4,17 @@ import { ArrowRight } from 'lucide-react'
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
-      <h1 className="text-5xl md:text-6xl font-bold mb-4 gradient-text">
-        T.A.O Marketing System
-      </h1>
+      <div className="mb-4 text-center">
+        <h1 className="text-7xl md:text-9xl font-black tracking-tight gradient-text">
+          T.A.O
+        </h1>
+        <p className="text-2xl md:text-3xl font-medium text-gray-300 mt-2">
+          Marketing System
+        </p>
+        <p className="text-lg md:text-xl text-gray-400 mt-1">
+          for Dental
+        </p>
+      </div>
 
       <p className="text-xl md:text-2xl text-gray-300 mb-8">
         Think / Act / Optimize
